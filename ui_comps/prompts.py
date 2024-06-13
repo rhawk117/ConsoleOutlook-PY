@@ -70,6 +70,11 @@ class Prompt:
         spacer = ConsoleStencil.multi_style('[ ? ]', fg_color='yellow', ansi='bold', style='bright')
         msg = ConsoleStencil.multi_style(prompt, **Prompt.GEN_PROMPT)
         print(PromptUtils.detr_center(should_center, f'\n{ spacer } { msg } { spacer }\n'))
+    
+    @staticmethod
+    def promptify(prompt: str) -> str:
+        spacer = ConsoleStencil.multi_style('[ ? ]', ansi='bold', style='bright')
+        return f'{spacer} {prompt} {spacer}'
         
     @staticmethod 
     def print_line(sep: str = '*') -> None:
@@ -79,6 +84,10 @@ class Prompt:
     def divider(sep: str) -> None:
         cols = os.get_terminal_size().columns
         return sep * cols
+    
+    @staticmethod
+    def clear() -> None:
+        os.system('cls' if os.name == 'nt' else 'clear')
     
 
 def prompt_demo():
