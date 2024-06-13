@@ -4,6 +4,90 @@ import re
 init(autoreset=True)
 
 
+class StencilData:
+    """
+        A class to store the static settings for ConsoleStencil.
+    """
+    VALID_COLORS: set[str] = {'red', 'green', 'blue', 'yellow', 'magenta', 'cyan', 'white', 'black'}
+
+    VALID_STYLES: set[str] = {'bright', 'dim', 'normal', 'reset_all'}
+
+    VALID_ANSI_STYLES: set[str] = {'bold', 'underline', 'italic', 'normal'}
+
+    COLOR_MAP: dict[str] = {color: getattr(Fore, color.upper()) for color in VALID_COLORS}
+    
+    BACKGROUND_MAP: dict[str] = {color: getattr(Back, color.upper()) for color in VALID_COLORS}
+    
+    STYLE_MAP: dict[str] = {style: getattr(Style, style.upper()) for style in VALID_STYLES}
+    
+    ANSI_STYLE_MAP = {
+        'bold': '\033[1m',
+        'underline': '\033[4m',
+        'italic': '\033[3m',
+        'normal': '\033[0m'
+    }
+    
+    SETTINGS = {
+        'VALID_COLORS': VALID_COLORS,
+        'VALID_STYLES': VALID_STYLES,
+        'VALID_ANSI_STYLES': VALID_ANSI_STYLES,
+        'COLOR_MAP': COLOR_MAP,
+        'BACKGROUND_MAP': BACKGROUND_MAP,
+        'STYLE_MAP': STYLE_MAP,
+        'ANSI_STYLE_MAP': ANSI_STYLE_MAP
+    }
+
+class TextStyle:
+    def __init__(self, fg_color: str = None, bg_color: str = None, ansi: str = None, style: str = None) -> None:
+        '''
+            A class to store the settings for a multi text style if you prefer to use an object.
+            
+            All values supplied must be valid or the object will not be valid and won't work 
+            with the multi_style method.
+            
+            o	ansi (str, optional): The text style such as 'bold', 'underline', etc. 
+                [Accepts 'bold', 'underline', 'italic', 'normal']
+                
+            o	fg_color (str, optional): The foreground color. 
+                [Accepts 'red', 'green', 'blue', 'yellow', 'magenta', 'cyan',  'white', 'black' as valid colors]
+
+            o	bg_color (str, optional): The background color 
+                [Accepts 'red', 'green', 'blue', 'yellow', 'magenta', 'cyan',  'white', 'black' as valid colors]
+
+            o	style (str, optional): A Colorama style 
+                [Accepts 'bright', 'dim', 'normal', 'reset_all']
+        '''
+        self.fg_color: str = fg_color
+        self.bg_color: str = bg_color
+        self.ansi: str = ansi
+        self.style: str = style
+    
+    def unpack(self) -> dict[str, str]:
+        return {k: v for k, v in vars(self).items() if v is not None}
+    
+    def validate(self) -> bool:
+        if self.fg_color is not None and self.fg_color.lower() not in StencilData.VALID_COLORS:
+            return False
+
+        if self.bg_color is not None and self.bg_color.lower() not in StencilData.VALID_COLORS:
+            return False
+
+        if self.ansi is not None and self.ansi.lower() not in StencilData.VALID_ANSI_STYLES:
+            return False
+
+        if self.style is not None and self.style.lower() not in StencilData.VALID_STYLES:
+            return False
+        
+        return True
+    
+    def apply(self, text: str) -> str:
+        if not self.validate():
+            return text
+        return ConsoleStencil.custom_style(text, self)
+
+    
+        
+
 class ConsoleStencil:
     '''
         A collection of static methods for applying color and style to text in the console.
@@ -30,25 +114,6 @@ class ConsoleStencil:
         ANSI escape codes.
     '''
 
-    VALID_COLORS: set[str] = {'red', 'green', 'blue', 'yellow', 'magenta', 'cyan', 'white', 'black'}
-
-    VALID_STYLES: set[str] = {'bright', 'dim', 'normal', 'reset_all'}
-
-    VALID_ANSI_STYLES: set[str] = {'bold', 'underline', 'italic', 'normal'}
-
-    COLOR_MAP: dict[str, str] = {color: getattr(Fore, color.upper()) for color in VALID_COLORS}
-
-    BACKGROUND_MAP: dict[str, str] = {color: getattr(Back, color.upper()) for color in VALID_COLORS}
-
-    STYLE_MAP: dict[str, str] = {style: getattr(Style, style.upper()) for style in VALID_STYLES}
-
-    ANSI_STYLE_MAP: dict[str, str] = {
-        'bold': '\033[1m',
-        'underline': '\033[4m',
-        'italic': '\033[3m',
-        'normal': '\033[0m'
-    }
-
     @staticmethod
     def ansify(text: str, ansi: str) -> str:
         """
@@ -57,16 +122,16 @@ class ConsoleStencil:
             Accepts 'bold', 'underline', 'italic', 'normal' as valid styles.
 
             Args:
-                text (str): _description_
-                ansi (str): _description_
+                text (str): text to apply ansi style to
+                ansi (str): type of style to apply
 
             Returns:
-                str: _description_
+                str: ansified string
         """
         ansi = ansi.lower()
-        if not ansi in ConsoleStencil.VALID_ANSI_STYLES:
+        if not ansi in StencilData.VALID_ANSI_STYLES:
             return text
-        return f"{ConsoleStencil.ANSI_STYLE_MAP[ansi]} {text} {ConsoleStencil.ANSI_STYLE_MAP['normal']}"
+        return f"{StencilData.ANSI_STYLE_MAP[ansi]} {text} {StencilData.ANSI_STYLE_MAP['normal']}"
 
     @staticmethod
     def colorize(text: str, color: str) -> str:
@@ -85,9 +150,9 @@ class ConsoleStencil:
 
         """
         color = color.lower()
-        if not color in ConsoleStencil.VALID_COLORS:
+        if not color in StencilData.VALID_COLORS:
             return text
-        return f"{ConsoleStencil.COLOR_MAP[color]} {text} {Style.RESET_ALL}"
+        return f"{StencilData.COLOR_MAP[color]} {text} {Style.RESET_ALL}"
 
     def bg_colorize(text: str, color: str) -> str:
         """
@@ -103,9 +168,9 @@ class ConsoleStencil:
             color (str): color to apply
         """
         color = color.lower()
-        if not color in ConsoleStencil.VALID_COLORS:
+        if not color in StencilData.VALID_COLORS:
             return text
-        return f"{ConsoleStencil.BACKGROUND_MAP[color]} {text} {Style.RESET_ALL}"
+        return f"{StencilData.BACKGROUND_MAP[color]} {text} {Style.RESET_ALL}"
 
     @staticmethod
     def font_variant(text: str, style: str) -> str:
@@ -122,16 +187,15 @@ class ConsoleStencil:
             str: The styled text.
         """
         style = style.lower()
-        if not style in ConsoleStencil.VALID_STYLES:
+        if not style in StencilData.VALID_STYLES:
             return text
 
-        return f"{ConsoleStencil.STYLE_MAP[style]}{text}{Style.RESET_ALL}"
+        return f"{StencilData.STYLE_MAP[style]}{text}{Style.RESET_ALL}"
 
     @staticmethod
     def rainbow(text: str) -> str:
         """
-            Apply a different color to each character in the text, 
-            cycling through available colors.
+            Apply a different color to each character in the text, cycling through available colors.
 
             Args:
                 text (str): The text to colorize.
@@ -139,9 +203,8 @@ class ConsoleStencil:
             Returns:
                 str: The rainbow-colored text.
         """
-        colors = list(ConsoleStencil.VALID_COLORS)
-        colored_chars = [ConsoleStencil.colorize(
-            char, colors[i % len(colors)]) for i, char in enumerate(text)]
+        colors = list(StencilData.VALID_COLORS)
+        colored_chars = [ConsoleStencil.colorize(char, colors[i % len(colors)]) for i, char in enumerate(text)]
         return ''.join(colored_chars)
 
     @staticmethod
@@ -166,22 +229,40 @@ class ConsoleStencil:
         styled_text = text
         for key, value in kwargs.items():
             value = value.lower()
-            if key == 'fg_color' and value in ConsoleStencil.VALID_COLORS:
-                styled_text = f"{ConsoleStencil.COLOR_MAP[value]} {styled_text}"
+            if key == 'fg_color' and value in StencilData.VALID_COLORS:
+                styled_text = f"{StencilData.COLOR_MAP[value]} {styled_text}"
 
-            elif key == 'bg_color' and value in ConsoleStencil.VALID_COLORS:
-                styled_text = f"{ConsoleStencil.BACKGROUND_MAP[value]} {styled_text}"
+            elif key == 'bg_color' and value in StencilData.VALID_COLORS:
+                styled_text = f"{StencilData.BACKGROUND_MAP[value]} {styled_text}"
 
-            elif key == 'ansi' and value in ConsoleStencil.VALID_ANSI_STYLES:
-                styled_text = f"{ConsoleStencil.ANSI_STYLE_MAP[value]} { styled_text} {ConsoleStencil.ANSI_STYLE_MAP['normal']}"
+            elif key == 'ansi' and value in StencilData.VALID_ANSI_STYLES:
+                styled_text = f"{StencilData.ANSI_STYLE_MAP[value]} {styled_text} {StencilData.ANSI_STYLE_MAP['normal']}"
 
-            elif key == 'style' and value in ConsoleStencil.VALID_STYLES:
-                styled_text = f"{ConsoleStencil.STYLE_MAP[value]} {styled_text}"
+            elif key == 'style' and value in StencilData.VALID_STYLES:
+                styled_text = f"{StencilData.STYLE_MAP[value]} {styled_text}"
 
-            else:
-                ConsoleStencil._log_error(f"Invalid {key}: '{value}'. This style will be ignored.")
 
         return f'{styled_text} {Style.RESET_ALL}'
+    
+    @staticmethod
+    def custom_style(text: str, style: TextStyle) -> str:
+        """
+            Applies a custom style to the text passed using a 
+            Text Style object instead of kwargs.
+
+            -If any styles are not valid the text is returned as is.
+            
+            Args:
+                text (str): The text to style.
+                style (TextStyle): The TextStyle object containing the style settings.
+
+            Returns:
+                str: The text with the style applied.
+        """
+        if not style.validate():
+            return text
+
+        return ConsoleStencil.multi_style(text, **style.unpack())
 
     @staticmethod
     def highlight_phrase(text: str, phrase: str, ansi: str) -> str:
@@ -204,10 +285,9 @@ class ConsoleStencil:
             return text
 
         ansi = ansi.lower()
-        ansi_style = ConsoleStencil.ANSI_STYLE_MAP[ansi]
-        return text.replace(phrase,
-                f"{ansi_style}{phrase}{ConsoleStencil.ANSI_STYLE_MAP['normal']}"
-                )
+        ansi_style = StencilData.ANSI_STYLE_MAP[ansi]
+        return text.replace(phrase, 
+                f"{ansi_style}{phrase}{StencilData.ANSI_STYLE_MAP['normal']}")
 
     @staticmethod
     def bold(text: str) -> str:
@@ -247,21 +327,18 @@ class ConsoleStencil:
             
             Args:
                 text (str): The full text that features the phrase.
-                
                 phrase (str): The phrase within the text to colorize.
-                
                 color (str): The color to apply to the phrase.
-                
                 is_background (bool): If True, the color is applied to the background.
             
             Returns:
                 str: The text with the phrase colorized.
         """
-        if not phrase in text or not color in ConsoleStencil.VALID_COLORS:
+        if not phrase in text or not color in StencilData.VALID_COLORS:
             return text
 
         color = color.lower()
-        color_map = ConsoleStencil.BACKGROUND_MAP if is_background else ConsoleStencil.COLOR_MAP
+        color_map = StencilData.BACKGROUND_MAP if is_background else StencilData.COLOR_MAP
         color_code = color_map[color]
         return text.replace(phrase, f'{color_code}{phrase}{Style.RESET_ALL}')
 
@@ -303,12 +380,71 @@ class ConsoleStencil:
 
         color = color.lower()
 
-        if color not in ConsoleStencil.VALID_COLORS:
+        if color not in StencilData.VALID_COLORS:
             return text
 
-        return regex.sub(lambda match: 
-            f"{ConsoleStencil.COLOR_MAP[color]}{match.group()}{Style.RESET_ALL}",text
+        return regex.sub(lambda match:
+            f"{StencilData.COLOR_MAP[color]}{match.group()}{Style.RESET_ALL}", text
         )
+
+
+def test_color_phrase():
+    print(ConsoleStencil.color_phrase(
+        'The word blood is red here because red is blood', 'gay', 'red'))
+    print(ConsoleStencil.color_phrase(
+        'The word cum is white here because cum is white', 'cum', 'white', is_background=True))
+
+
+def ansi_methods():
+    print(ConsoleStencil.ansify('Hello, World! (bold)', 'bold'))
+    print(ConsoleStencil.ansify('Hello, World! (underline)', 'underline'))
+    print(ConsoleStencil.ansify('Hello, World! (italic)', 'italic'))
+    print(ConsoleStencil.ansify('Hello, World! (normal)', 'normal'))
+
+
+def color_methods():
+    print(ConsoleStencil.colorize('Hello, World! (red)', 'red'))
+    print(ConsoleStencil.colorize('Hello, World! (green)', 'green'))
+    print(ConsoleStencil.colorize('Hello, World! (blue)', 'blue'))
+    print(ConsoleStencil.colorize('Hello, World! (yellow)', 'yellow'))
+    print(ConsoleStencil.colorize('Hello, World! (magenta)', 'magenta'))
+    print(ConsoleStencil.colorize('Hello, World! (cyan)', 'cyan'),)
+    print(ConsoleStencil.colorize('Hello, World! (white)', 'white'))
+    print(ConsoleStencil.colorize('Hello, World! (black)', 'black'))
+    print(ConsoleStencil.rainbow('Hello, World! (rainbow)'))
+    print(ConsoleStencil.bg_colorize('Hello, World! (red bg)', 'red'))
+
+
+def font_vars():
+    print(ConsoleStencil.font_variant('Hello, World! (bright)', 'bright'))
+    print(ConsoleStencil.font_variant('Hello, World! (dim)', 'dim'))
+
+
+def multi_style():
+    print(ConsoleStencil.multi_style(
+        "Hello, World! (info: fg_color='red', bg_color='blue', ans='bold)', fg_color='red'", bg_color='blue', ansi='bold'))
+    print(ConsoleStencil.multi_style("Hello, World! (info: fg_color='green', bg_color='yellow', ansi='unerline)'",
+          fg_color='green', bg_color='yellow', ansi='underline'))
+    print(ConsoleStencil.multi_style("Hello, World! (info: fg_color='magenta', bg_color='cyan', ansi=italic)'",
+          fg_color='magenta', bg_color='cyan', ansi='italic'))
+    print(ConsoleStencil.multi_style("Hello, World! (info: fg_color='white', bg_color='black', style=bright)'",
+          fg_color='white', bg_color='black', style='bright'))
+
+
+def run_test(test_name, method_calls):
+    print('Running Test for ' + test_name)
+    method_calls()
+    input('Press Enter to Continue')
+
+def run_all():
+    run_test('Color Phrase', test_color_phrase)
+    run_test('ANSI Methods', ansi_methods)
+    run_test('Color Methods', color_methods)
+    run_test('Font Variants', font_vars)
+    run_test('Multi Style', multi_style)
+    
+
+
 
 
 def regex_test() -> None:
@@ -317,9 +453,15 @@ def regex_test() -> None:
     colored_text = ConsoleStencil.color_regex_matches(text, pattern, 'green')
     print(colored_text)
 
+def text_style() -> None:
+    style = TextStyle(ansi='bold', fg_color='red') 
+    print(style.apply('Hello, World!'))
+
+
 
 def main() -> None:
-    regex_test()
+    text_style()
+    # regex_test()
 
 
 if __name__ == '__main__':

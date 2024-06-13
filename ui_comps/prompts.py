@@ -34,10 +34,6 @@ class PromptUtils:
         cols = os.get_terminal_size().columns
         return sep * cols
     
-    
-    
-
-
 class Prompt:
     GEN_SPACER: dict[str, str] = { 'ansi' : 'bold', 'style' : 'bright' }
     GEN_PROMPT: dict[str, str] = { 'ansi' : 'italic', 'style' : 'bright' }
@@ -58,7 +54,7 @@ class Prompt:
     def wait():
         spacer = ConsoleStencil.multi_style('[ * ]', **Prompt.GEN_SPACER)
         styled_msg = ConsoleStencil.multi_style('Press < ENTER > to Continue...', **Prompt.GEN_PROMPT)
-        centered_msg = PromptUtils.center_str(f'\n{spacer} {styled_msg} {spacer}\n')
+        centered_msg = PromptUtils.center_str(f'\n{spacer} { styled_msg } {spacer}\n')
         input(ConsoleStencil.color_phrase(centered_msg, phrase='< ENTER >', 
             color='green')
         )
@@ -92,11 +88,12 @@ def prompt_demo():
     Prompt.print_line()
     Prompt.ask('What is your name')
     Prompt.print_line()
-
-
+    
+def test():
+    Prompt.print_line('')
 
 def main() -> None:
-    prompt_demo()
-    
+    test()
+        
 if __name__ == "__main__":
     main()
