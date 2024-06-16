@@ -5,9 +5,6 @@ import time
 from typing import Callable
 from prompts import Prompt
 
-
-
-
 class MenuUtils:
     @staticmethod
     def clear() -> None:
@@ -45,10 +42,6 @@ class MenuStyle:
         
         return self.unselected.apply(f'{option}')
     
-    
-    
-         
-
 
 class Option:
     def __init__(self, title: str, value, icon: str = '') -> None:
@@ -62,11 +55,16 @@ class SimpleMenu:
         self.style = menu_style if menu_style else MenuDefaults.create_default()
         self.options: list = options
         self.prompt: str = self.style.prompt.apply(prompt)
+        self.__set_menu_options(should_divide)
+        
+    def __set_menu_options(self, should_divide: bool) -> None:
         self.highlight: int = 0
         self.running: bool = False
         self._should_divide: bool = should_divide
         self._divider: str = '*'
-        self.option_formatter = lambda option: f'   [ { option } ]'
+        self.option_formatter = lambda option: f'   [ {option} ]'
+
+        
     
     def set_option_format(self, option_format: Callable[[str], str]) -> None:
         '''
@@ -88,10 +86,11 @@ class SimpleMenu:
             self._divider = divider
     
     
-    
-    def render_routine(self, idx, item) -> None:
-        option = self.option_formatter(item)
-        print(self.style.option_stylize(idx == self.highlight, option))
+    def render_routine(self, idx: int, item) -> None:
+        print(self.style.option_stylize(idx == self.highlight, 
+            self.option_formatter(item)
+            )
+        )
 
         if self._should_divide:
             Prompt.print_line(self._divider)
@@ -100,16 +99,15 @@ class SimpleMenu:
     def render(self) -> None:
         Prompt.clear()
         print(self.prompt)
-        Prompt.print_line('-')
         for idx, item in enumerate(self.options):
             self.render_routine(idx, item)
             
     
     def handle_keys(self, key: keyboard.KeyboardEvent) -> None:
-        if key.name == 'up':
+        if key.name == 'up' or key.name == 'w':
             self.highlight = (self.highlight - 1) % len(self.options)
 
-        elif key.name == 'down':
+        elif key.name == 'down' or key.name == 's':
             self.highlight = (self.highlight + 1) % len(self.options)
 
         elif key.name == 'enter':
@@ -121,11 +119,11 @@ class SimpleMenu:
             the selected option once the menu
             stops.
         '''
-        self.running = True
         self.ui_loop()
         return self.options[self.highlight]
     
     def ui_loop(self) -> None:
+        self.running = True
         while self.running:
             self.render()
             key = keyboard.read_event()
@@ -135,14 +133,13 @@ class SimpleMenu:
             time.sleep(0.01)
 
 class ValueMenu(SimpleMenu):
-    def __init__(self, options: list[Option], prompt: str, menu_style: MenuStyle = None) -> None:
+    def __init__(self, options: list[Option], prompt: str, menu_style: MenuStyle = None, should_divide: bool = True) -> None:
         super().__init__(options, prompt, menu_style)
         self.option_formatter = lambda option: f'   [ {option.title} ]'
     
        
-    def user_choice(self):
+    def get_choice(self):
         return self.options[self.highlight].value
-    
     
     def choice_title(self):
         return self.options[self.highlight].title
@@ -156,7 +153,6 @@ class ValueMenu(SimpleMenu):
             to get the select choice call 'get_choice_value'
             after the menu has stopped.
         '''
-        self.running = True
         self.ui_loop()
     
     def add_option(self, option: Option) -> None:
@@ -166,8 +162,7 @@ class ValueMenu(SimpleMenu):
 class SimplePagedMenu(SimpleMenu):
     def __init__(self, options: list[str], prompt: str, page_size: int = 5, menu_style: MenuStyle = None) -> None:
         super().__init__(options, prompt, menu_style)
-        self.nav_txt = self.style.nav.apply(
-            "[ < i > Move ↑ / ↓  | Page ← / → | Select -> Enter  < i > ]")
+        self.nav_txt = self.style.nav.apply("[ < i > Move ↑ / ↓  | Page ← / → | Select -> Enter  < i > ]")
         self.__setup_menu(page_size)
 
     def __setup_menu(self, page_size: int) -> None:
@@ -179,7 +174,7 @@ class SimplePagedMenu(SimpleMenu):
     def current_page_options(self):
         start = (self._current_page - 1) * self.page_size
         end = start + self.page_size
-        return self.options[start: end]
+        return self.options[start : end]
 
     def render(self) -> None:
         Prompt.clear()
@@ -190,9 +185,11 @@ class SimplePagedMenu(SimpleMenu):
     def handle_keys(self, key: keyboard.KeyboardEvent) -> None:
         super().handle_keys(key)
         if key.name == 'left':
-            self._current_page = (self._current_page - 1) % self.total_pages
+            self._current_page = (self._current_page - 1) % self.total_pages or self.total_pages
+            
         elif key.name == 'right':
-            self._current_page = (self._current_page + 1) % self.total_pages
+            self._current_page = (self._current_page + 1) % self.total_pages or 1 
+            
 
     def run(self):
         super().run()
@@ -209,6 +206,7 @@ class PageUtils:
     def handle_paging(paged_menu, key):
         if key.name == 'left':
             paged_menu._current_page -= 1 
+            
         elif key.name == 'right':
             paged_menu._current_page += 1 
     
@@ -237,11 +235,16 @@ class SimplePagedMenu(SimpleMenu):
 
     def handle_keys(self, key: keyboard.KeyboardEvent) -> None:
         super().handle_keys(key)
-        PageUtils.handle_paging(self, key)
+        if key.name == 'left' or key.name == 'a':
+            self._current_page = (self._current_page - 1) % self.total_pages or self.total_pages
+        elif key.name == 'right' or key.name == 'd':
+            self._current_page = (self._current_page + 1) % self.total_pages or 1
+        
 
     def run(self):
         super().run()
         return self.current_page_options[self.highlight]
+    
 
 
 class ValuePagedMenu(ValueMenu):
@@ -277,26 +280,24 @@ class ValuePagedMenu(ValueMenu):
 
     @property
     def current_page_options(self):
-        
         return PageUtils.get_page_options(self)
 
     def render(self) -> None:
         Prompt.clear()
-        print(
-            f'{self.prompt} - {self.nav_txt} | Page {self._current_page}/{self.total_pages}')
+        print(f'{self.prompt} - {self.nav_txt} | Page {self._current_page}/{self.total_pages}')
         for idx, option in enumerate(self.current_page_options):
             self.render_routine(idx, option)
 
     def handle_keys(self, key: keyboard.KeyboardEvent) -> None:
         super().handle_keys(key)
-        if key.name == 'left':
+        if key.name == 'left' or key.name == 'a':
             self._current_page = (self._current_page - 1) % self.total_pages
-        elif key.name == 'right':
+        elif key.name == 'right' or key.name == 'd':
             self._current_page = (self._current_page + 1) % self.total_pages
 
     def run(self):
         super().run()
-        return self.user_choice
+        return self.get_choice
 
 
 class Animal:
@@ -337,7 +338,7 @@ def value_menu():
     menu = ValueMenu(options, 'Select an animal')
     menu.set_option_format(option_formatter)
     menu.run()
-    animal = menu.user_choice()
+    animal = menu.get_choice()
     animal.speak()
     
 def simple_paged_menu():
@@ -351,7 +352,7 @@ def value_paged_menu():
     options = [Option('animal', animal) for animal in animals]
     menu = ValuePagedMenu(options, 'Select an animal', 2)
     menu.run()
-    animal = menu.user_choice
+    animal = menu.get_choice
     animal.speak()
 
     
