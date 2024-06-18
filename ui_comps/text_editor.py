@@ -2,35 +2,36 @@ import os
 import sys
 import keyboard
 
-
 class MenuOption:
-    def __init__(self, label, action, key_binding=None):
+    def __init__(self, label, action):
         self.label = label
         self.action = action
-        self.key_binding = key_binding
 
     def execute(self):
         self.action()
 
-    def __str__(self):
-        if self.key_binding:
-            return f"{self.label} ({self.key_binding})"
-        else:
-            return self.label
-
+# TODO
+# Add Paging for larger strings of text.
+# - Only included when the size of the header + text + bottom menu exceeds the terminal size.
+# Refactor the Menu displayed at the bottom into a seperate object
+# Optimize Current Design and storing of sizes into variables
+# Refactor 'MenuOption' to include more of the work and add bindings directly from
+# Text Editor Class for Sending and Recieving Emails
+# Refactor using the Prompt Class 
 
 class TextViewer:
-    def __init__(self, text: str, header: str = None, options: list[MenuOption] = None) -> None:
+    def __init__(self, text: str, header: str = None, options: list[str] = None) -> None:
         self.text: list[str] = text.split('\n')
         self.header: str = header or ""
-        self.options: list[MenuOption] = options or []
+        self.options: list[MenuOption] = [MenuOption(option, lambda: print(f"{option} selected")) for option in options] if options else []
         self.current_line: int = 0
-        self.current_page: int = 1
-        self.max_lines: int = os.get_terminal_size().lines - len(self.header.split('\n')) - \
-            4  # Account for header, menu, border, and spacing
-        self.max_pages: int = (
-            len(self.text) + self.max_lines - 1) // self.max_lines
+        self.max_lines: int = os.get_terminal_size().lines - len(self.header.split('\n')) - 4  
+        self.key_bindings: dict = {}
+        self.selected_option: int = 0
         self.active: bool = False
+
+    def bind_key(self, key, action) -> None:
+        self.key_bindings[key] = action
 
     def run(self) -> None:
         self.active = True
@@ -47,10 +48,10 @@ class TextViewer:
     def show_header(self) -> None:
         header_lines = self.header.split('\n')
         print('\n'.join(header_lines))
-        print('=' * os.get_terminal_size().columns)  # Separator line
+        print('=' * os.get_terminal_size().columns)  
 
     def show_text(self) -> None:
-        start_line = (self.current_page - 1) * self.max_lines
+        start_line = max(0, self.current_line - self.max_lines // 2)
         end_line = min(len(self.text), start_line + self.max_lines)
         for i, line in enumerate(self.text[start_line:end_line], start=start_line):
             if i == self.current_line:
@@ -60,63 +61,45 @@ class TextViewer:
 
     def show_menu(self):
         terminal_width = os.get_terminal_size().columns
-        menu_width = max(sum(len(str(option)) for option in self.options) + len(self.options) * 4, len(
-            # Account for spaces, padding, and page info
-            f"Page {self.current_page}/{self.max_pages}"))
+        menu_width = sum(len(option.label) for option in self.options) + len(self.options) * 4  
         start_x = (terminal_width - menu_width) // 2
-        print("\n" + "=" * terminal_width)  # Separator line
+        print("\n" + "=" * terminal_width)  
         print(" " * start_x, end="")
         for i, option in enumerate(self.options):
             if i == self.selected_option:
-                # Add padding and highlight selected option
-                print(f"[ \033[1;34m{option}\033[0m ]", end="  ")
+                print(f"[ \033[1;34m{option.label}\033[0m ]", end="  ")
             else:
-                print(f"[ {option} ]", end="  ")  # Add padding
-        print(f"  Page {self.current_page}/{self.max_pages}")
+                print(f"[ {option.label} ]", end="  ")  
+        print()
 
     def handle_input(self):
         key = keyboard.read_key()
         if key == 'up':
-            self.current_line = max(self.current_line - 1, 0)
-            if self.current_line < (self.current_page - 1) * self.max_lines:
-                self.current_page = max(self.current_page - 1, 1)
+            self.current_line = (self.current_line - 1) % len(self.text)
         elif key == 'down':
-            self.current_line = min(self.current_line + 1, len(self.text) - 1)
-            if self.current_line >= self.current_page * self.max_lines:
-                self.current_page = min(self.current_page + 1, self.max_pages)
+            self.current_line = (self.current_line + 1) % len(self.text)
         elif key == 'right':
-            self.current_page = (self.current_page +
-                                 1) % (self.max_pages + 1) or 1
-            self.current_line = min(
-                (self.current_page - 1) * self.max_lines, len(self.text) - 1)
+            self.selected_option = (
+                self.selected_option + 1) % len(self.options)
         elif key == 'left':
-            self.current_page = (self.current_page -
-                                 1) % (self.max_pages + 1) or self.max_pages
-            self.current_line = min(
-                (self.current_page - 1) * self.max_lines, len(self.text) - 1)
-        elif key in [option.key_binding for option in self.options if option.key_binding]:
-            for option in self.options:
-                if option.key_binding == key:
-                    option.execute()
-                    break
+            self.selected_option = (
+                self.selected_option - 1) % len(self.options)
         elif key == 'enter':
             if self.selected_option is not None:
                 self.options[self.selected_option].execute()
+                
+        elif key in self.key_bindings:
+            self.key_bindings[key]()
         elif key == 'q':
             self.exit()
 
-    def add_option(self, label, action, key_binding=None) -> None:
-        self.options.append(MenuOption(label, action, key_binding))
+    def add_option(self, label, action) -> None:
+        self.options.append(MenuOption(label, action))
 
     def exit(self) -> None:
         self.active = False
 
-    @property
-    def selected_option(self):
-        for i, option in enumerate(self.options):
-            if keyboard.is_pressed(option.key_binding):
-                return i
-        return None
+
 def main():
     # Example usage
     long_text = """
